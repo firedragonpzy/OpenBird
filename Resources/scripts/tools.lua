@@ -8,12 +8,26 @@ local flySpeed  = 2.5
 local flyOffset = 5
 
 -- vars
+g_flyTag = 1000
+
 g_rateButton = nil
 g_playButton = nil
 g_rankButton = nil
 
 cc.FileUtils:getInstance():addSearchPath("res/")
 local textureAtlas = cc.Director:getInstance():getTextureCache():addImage("atlas.png")
+
+wingPath = cc.FileUtils:getInstance():fullPathForFilename("sfx_wing.wav")
+hitPath = cc.FileUtils:getInstance():fullPathForFilename("sfx_hit.wav")
+scorePath = cc.FileUtils:getInstance():fullPathForFilename("sfx_point.wav")
+fallPath = cc.FileUtils:getInstance():fullPathForFilename("sfx_die.wav")
+uiPath = cc.FileUtils:getInstance():fullPathForFilename("sfx_swooshing.wav")
+
+cc.SimpleAudioEngine:getInstance():preloadEffect(wingPath)
+cc.SimpleAudioEngine:getInstance():preloadEffect(hitPath)
+cc.SimpleAudioEngine:getInstance():preloadEffect(scorePath)
+cc.SimpleAudioEngine:getInstance():preloadEffect(fallPath)
+cc.SimpleAudioEngine:getInstance():preloadEffect(uiPath)
 
 visibleSize = cc.Director:getInstance():getVisibleSize()
 print("visibleSize :"..visibleSize.width.." "..visibleSize.height)
@@ -45,12 +59,17 @@ end
 function createAtlasSprite(name)
     local tmpTable = a[name]
 
+    local rectX = tmpTable.x
+    local rectY = tmpTable.y
+    local rectWidth = tmpTable.width
+    local rectHeight = tmpTable.height
+
     -- fix 1px edge bug
     if name == "land" then
-        tmpTable.x = tmpTable.x + 1            
+        rectX = rectX + 1            
     end
 
-    local rect = cc.rect(tmpTable.x, tmpTable.y, tmpTable.width, tmpTable.height)
+    local rect = cc.rect(rectX, rectY, rectWidth, rectHeight)
     local frame = cc.SpriteFrame:createWithTexture(textureAtlas, rect)
     local atlasSprite = cc.Sprite:createWithSpriteFrame(frame)
 
@@ -121,7 +140,9 @@ function createFlyAction(position)
     local moveUp   = cc.MoveTo:create(1.0 / flySpeed, cc.p(position.x, position.y + flyOffset))
     local moveDown = cc.MoveTo:create(1.0 / flySpeed, cc.p(position.x, position.y - flyOffset))
 
-    return cc.RepeatForever:create(cc.Sequence:create(moveUp, moveDown))
+    local flyAction = cc.RepeatForever:create(cc.Sequence:create(moveUp, moveDown))
+    flyAction:setTag(g_flyTag)
+    return flyAction
 end
 
 local clickedButton = nil
@@ -184,8 +205,9 @@ function onCommonMenuLayerTouchEnded(touch, event)
             end
             local trans = cc.TransitionFade:create(0.5, gameScene, cc.c3b(0,0,0))
             cc.Director:getInstance():replaceScene(trans)
+            cc.SimpleAudioEngine:getInstance():playEffect(uiPath)
         elseif clickedButton == g_rankButton then
-
+            showAds()
         end
 
         clickedButton = nil

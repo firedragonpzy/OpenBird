@@ -15,12 +15,8 @@ local pipeDistance = 100
 
 local landHeight = 112
 
-local tapV = 200
-local systemGravity = -700
-
-local wingPath = cc.FileUtils:getInstance():fullPathForFilename("sfx_wing.wav")
-local hitPath = cc.FileUtils:getInstance():fullPathForFilename("sfx_hit.wav")
-local scorePath = cc.FileUtils:getInstance():fullPathForFilename("sfx_point.wav")
+local tapV = 260
+local systemGravity = -900
 --config end
 
 -- vars
@@ -57,8 +53,10 @@ local function showGameOverLayer()
 
     local gameOverLogo = createAtlasSprite("text_game_over")
     local scorePanel = createAtlasSprite("score_panel")
+
     local nowScoreNode = cc.Node:create()
     local bestScoreNode = cc.Node:create()
+    local newInfoSprite = createAtlasSprite("new")
 
     local playButton = createAtlasSprite("button_play")
     local rankButton = createAtlasSprite("button_score")
@@ -80,6 +78,11 @@ local function showGameOverLayer()
 
         bestScoreNode:setPosition(cc.p(200, 40))
         scorePanel:addChild(bestScoreNode)
+
+        -- new info
+        newInfoSprite:setPosition(cc.p(155, 60))
+        newInfoSprite:setVisible(false)
+        scorePanel:addChild(newInfoSprite)
 
 
         overLayer:addChild(scorePanel)
@@ -106,6 +109,7 @@ local function showGameOverLayer()
 
     local function showOverItems()
         local function showGameOverLogo()
+            cc.SimpleAudioEngine:getInstance():playEffect(uiPath)
             scoreNode:setVisible(false)
 
             gameOverLogo:setVisible(true)
@@ -118,6 +122,7 @@ local function showGameOverLayer()
         end
 
         local function showScorePanel()
+            cc.SimpleAudioEngine:getInstance():playEffect(uiPath)
             scorePanel:setVisible(true)
 
             local place = cc.Place:create(cc.p(midX, -100))
@@ -126,9 +131,36 @@ local function showGameOverLayer()
             scorePanel:runAction(cc.Sequence:create(place, move1))
         end
 
+        local function showNewRecordInfo()
+            newInfoSprite:setVisible(true)
+        end
+
+        local function showMedal()
+            if totalScore < 10 then
+                return
+            end
+
+            local medalStr = "medals_"..(math.max(4 - math.floor(totalScore / 10), 0))
+            local medalSprite = createAtlasSprite(medalStr)
+
+            medalSprite:setPosition(cc.p(55, 60))
+            scorePanel:addChild(medalSprite)
+
+        end
+
         local function showScoreNumber()
             --CreateSpriteScore(nowScoreNode, totalScore, 2, 2)
-            CreateSpriteScore(bestScoreNode, 28, 2, 2)
+            local savedBestScore = cc.UserDefault:getInstance():getIntegerForKey("bestScore", 0)
+            if totalScore > savedBestScore then
+                savedBestScore = totalScore
+                -- show new
+                showNewRecordInfo()
+                -- save score
+                cc.UserDefault:getInstance():setIntegerForKey("bestScore", totalScore)
+            end
+
+            CreateSpriteScore(bestScoreNode, savedBestScore, 2, 2)
+            CreateSpriteScore(nowScoreNode, 0, 2, 2)
 
             local tmpScore = 0
             local showSingleNumberFunc = 0
@@ -141,7 +173,7 @@ local function showGameOverLayer()
                 end
             end
 
-            showSingleNumberFunc = cc.Director:getInstance():getScheduler():scheduleScriptFunc(showSingleNumber, 0.1, false)
+            showSingleNumberFunc = cc.Director:getInstance():getScheduler():scheduleScriptFunc(showSingleNumber, 0.5 / totalScore, false)
         end
 
         local function showBottomButton()
@@ -152,10 +184,12 @@ local function showGameOverLayer()
         local delay1 = cc.DelayTime:create(1)
         local showOverLogoFunc = cc.CallFunc:create(showGameOverLogo)
         local showScorePanelFunc = cc.CallFunc:create(showScorePanel)
+        local showMedalFunc = cc.CallFunc:create(showMedal)
         local showScoreNumberFunc = cc.CallFunc:create(showScoreNumber)
         local showBottomButtonFunc = cc.CallFunc:create(showBottomButton)
 
-        local action = cc.Sequence:create(delay1, showOverLogoFunc, delay1, showScorePanelFunc, showScoreNumberFunc, delay1, showBottomButtonFunc)
+        local action = cc.Sequence:create(delay1, showOverLogoFunc, delay1, showScorePanelFunc, showMedalFunc, 
+            showScoreNumberFunc, delay1, showBottomButtonFunc)
         actionNode:runAction(action)
     end
 
@@ -217,7 +251,7 @@ local function createPipes(layer)
 	end
 
 	initPipe()
-	createPipeFunc = cc.Director:getInstance():getScheduler():scheduleScriptFunc(createPipe, 1.2, false)
+	createPipeFunc = cc.Director:getInstance():getScheduler():scheduleScriptFunc(createPipe, 1.3, false)
 end
 
 
@@ -269,7 +303,7 @@ local function createLayerBg()
     end  
 
     local function hideReady()
-
+        spriteBird:stopActionByTag(g_flyTag)
     	rTextSprite:runAction(cc.FadeOut:create(0.2))
     	rImage:runAction(cc.FadeOut:create(0.2))
 
@@ -326,7 +360,7 @@ local function createLayerBg()
 	-- check hit and calc score
     local function rotateBird()
         local v = spriteBird:getPhysicsBody():getVelocity()
-        spriteBird:setRotation(math.min(math.max(-90, v.y * 0.5), 30))
+        spriteBird:setRotation(math.min(math.max(-90, v.y * 0.2 + 60), 30))
     end
 
 	
@@ -345,11 +379,15 @@ local function createLayerBg()
             if math.abs(pipes[i]:getPositionX() - birdX) < (birdSize + 26) then
                 -- check down
                 if spriteBird:getPositionY() < pipes[i]:getPositionY() + pipeHeight / 2 + birdSize then
+                    cc.SimpleAudioEngine:getInstance():playEffect(fallPath)
                     GameOver()
+                    return 
                 end
                 -- check up
                 if spriteBird:getPositionY() > pipes[i]:getPositionY() + pipeHeight / 2 + pipeDistance - birdSize then
+                    cc.SimpleAudioEngine:getInstance():playEffect(fallPath)
                     GameOver()
+                    return
                 end
             end
 
@@ -358,6 +396,7 @@ local function createLayerBg()
                 totalScore = totalScore + 1
                 cc.SimpleAudioEngine:getInstance():playEffect(scorePath)
                 refreshScore()
+                return
             end
         end
 	end
@@ -407,7 +446,10 @@ local function createLayerBg()
         end
         spriteBird:getPhysicsBody():setEnable(false)
         spriteBird:stopAllActions()
+        spriteBird:setRotation(-90) 
+        
         cc.Director:getInstance():getScheduler():unscheduleScriptEntry(birdRotateFunc)
+        birdRotateFunc = 0
     end
 
     local contactListener = cc.EventListenerPhysicsContactWithBodies:create(groudNode:getPhysicsBody(), spriteBird:getPhysicsBody())
@@ -417,16 +459,14 @@ local function createLayerBg()
     return layerBg
 end
 
-
-
-
-cc.SimpleAudioEngine:getInstance():preloadEffect(wingPath)
-cc.SimpleAudioEngine:getInstance():preloadEffect(hitPath)
-cc.SimpleAudioEngine:getInstance():preloadEffect(scorePath)
-
 local function resetGameSceneValue()
     totalScore = 0
     gameOver = false
+
+    if birdRotateFunc ~= 0 then
+        cc.Director:getInstance():getScheduler():unscheduleScriptEntry(birdRotateFunc)
+        birdRotateFunc = 0
+    end
 end
 -- run
 function createGameScene()

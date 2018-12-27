@@ -1,4 +1,11 @@
 proj.win32/Debug.win32/
 proj.win32/FlappyBird.opensdf
 proj.win32/FlappyBird.sdf
-cocos2d/
+proj.android/assets/
+proj.android/bin/
+proj.android/obj/
+proj.android/gen/
+proj.android/libs/
+proj.android/.settings/
+proj.android/google-play-services_lib/bin/
+proj.android/google-play-services_lib/gen/
